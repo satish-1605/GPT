@@ -1,0 +1,5 @@
+datasets
+jupyter
+python-dotenv
+torch
+scikit-learn
