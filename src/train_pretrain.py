@@ -2,11 +2,11 @@
 from src.models.gpt import GPT
 from src.utils.config import GPTConfig
 
-from src.optim.optimizer import create_optimizer
+from src.training.optimizer import create_optimizer
 
 from src.datasets.data_pipeline import get_train_val_loaders
 from src.trainer.trainer import train_one_epoch
-from src.trainer.validate import validate
+from src.training.validate import validate
 from src.utils.checkpoint import save_checkpoint
 
 def main():

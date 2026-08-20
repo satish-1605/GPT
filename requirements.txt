@@ -3,3 +3,4 @@ jupyter
 python-dotenv
 torch
 scikit-learn
+regex

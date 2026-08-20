@@ -1,11 +1,9 @@
 {
-    "algorithm": "BPE",
-    "vocab_size": 5000,
-    "version": "1.0",
-    "special_tokens": [
-        "<PAD>",
-        "<UNK>",
-        "<BOS>",
-        "<EOS>"
-    ]
+  "tokenizer_type": "GPT2BPE",
+  "vocab_size": 5000,
+  "pre_tokenizer": "GPT2",
+  "byte_level": true,
+  "special_tokens": [
+    "<|endoftext|>"
+  ]
 }

@@ -1,7 +1,7 @@
-from src.models.gpt import GPT
+from src.models.gpt2 import GPT2
 from src.utils.config import GPTConfig
-from src.inference.load_model import load_model
-from src.datasets.clean import clean_text
+from src.training.checkpoint import load_model_checkpoint
+from src.datasets.clean import clean_document
 from src.tokenizer.tokenizer import BPETokenizer
 from src.inference.sampling import (greedy_sampling, temperature_sampling, top_k_sampling, 
                                     top_p_sampling)
@@ -10,15 +10,15 @@ import torch
 
 config = GPTConfig()
 tokenizer = BPETokenizer.from_pretrained(config.load_dir)
-model = GPT(config)
+model = GPT2(config)
 
-model = load_model(
-        model=model,
-        filepath=config.checkpoint_path,
-        device=config.device
-    )
 
-def generate(prompt, max_new_tokens: int = 100, 
+model = load_model_checkpoint(path=config.checkpoint_path,
+                             model= model,
+                             device = config.device)
+
+def generate(prompt,
+             max_new_tokens = 100,
              sampling_strategy ="greedy_sampling",
              T=0.5,
              k=10, 
@@ -33,16 +33,16 @@ def generate(prompt, max_new_tokens: int = 100,
     Returns:
         str: Generated text.
     """
-    prompt = clean_text(prompt)   
+    prompt = clean_document(prompt)   
 
     generated_ids = tokenizer.encode(prompt) 
-    eos_token_id = tokenizer.token_to_id.get("<EOS>")
+    eos_token_id = tokenizer.encode("<|endoftext|>")[0]
 
 
     with torch.no_grad():
         for _ in range(max_new_tokens):
 
-            context_ids  = generated_ids[-config.max_seq_len:]
+            context_ids  = generated_ids[-max_new_tokens:]
 
             input_ids = torch.tensor(context_ids,
                                     dtype=torch.long, 
@@ -75,5 +75,5 @@ def generate(prompt, max_new_tokens: int = 100,
     return generated_text
 
 if __name__ == "__main__":
-    text = generate("Once upon a time there", sampling_strategy="top_p_sampling")
+    text = generate("Once upon a time there", sampling_strategy="greedy_sampling")
     print(text)

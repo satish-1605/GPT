@@ -1,34 +1,54 @@
-from src.datasets.clean import clean_text
-from src.datasets.download import ds
-
-from src.tokenizer.tokenizer import BPETokenizer
-
+from pathlib import Path
 class DatasetPreprocessor:
-    def __init__(self, tokenizer):
-        self.tokenizer = tokenizer
+    def __init__(self, min_length:int=50):
+        self.min_length  = min_length
 
 
-    def preprocess_story(self, story: str) -> list[int]:
-        story = clean_text(story)
-        ids = self.tokenizer.encode(story)
-        bos_id = self.tokenizer.token_to_id["<BOS>"]
-        eos_id = self.tokenizer.token_to_id["<EOS>"]
-        return [bos_id] + ids + [eos_id]
+    def preprocess_document(self, document: str) -> str:
+        """
+        Prepare a single document while preserving
+        its natural language content.
+        """
+        document = document.strip()
+        return document
 
     def preprocess_corpus(
             self,
-            dataset,
-            max_stories: int | None = None
-        ) -> list[list[int]]:
-        processed_stories = []
-        if max_stories is None:
-            max_stories = len(dataset)
+            input_file:str = Path,
+            max_documents: int | None = None
+        ) -> list[str]:
 
-        for i in range(max_stories):
-            story = dataset[i]["text"]
-            token_ids = self.preprocess_story(story)
-            processed_stories.append(token_ids)
-        return processed_stories
+        """
+        Load and preprocess the cleaned FineWeb corpus.
+
+        Returns:
+            List of cleaned documents.
+        """
+        input_file = Path(input_file)
+
+        with input_file.open("r", encoding = "utf-8") as file:
+            content = file.read()   
+
+        documents = content.split("\n\n")
+
+        processed_documents = []  
+
+        for document in documents:
+            document = self.preprocess_document(document)
+
+            if len(document) < self.min_length:
+                continue
+
+            processed_documents.append(document)
+
+            if (
+                max_documents is not None
+                and len(processed_documents) >= max_documents
+            ):
+                break
+
+        return processed_documents
+
 
 
 

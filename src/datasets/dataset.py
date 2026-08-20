@@ -1,36 +1,32 @@
 import torch
 from torch.utils.data import Dataset
-from typing import List
+from src.utils.window import build_window_indices
+from src.utils.alignment import build_input_target
 
 class GPTDataset(Dataset):
     def __init__(self, 
-                 tokenized_stories: List[List[int]], 
-                 block_size:int):
-        self.tokenized_stories = tokenized_stories
-        self.block_size = block_size
-        self.samples = []
+                 token_stream: list[int], 
+                 context_length:int,
+                 stride:int):
+        self.token_stream = token_stream
+        self.context_length = context_length
+        self.stride = stride
 
-        self._build_samples()
 
-    def _build_samples(self):
-        """
-        Convert tokenized stories into GPT training samples.
-        """
-        for story in self.tokenized_stories:
-            if len(story) <= self.block_size:
-                continue
-            for start in range(len(story)-self.block_size):
-                end = start + self.block_size
-
-                input_ids = story[start:end]
-                target_ids = story[start+1 : end+1]
-                self.samples.append((input_ids, target_ids))
+        self.window_indices = build_window_indices(self.token_stream, 
+                                                   self.context_length, 
+                                                   self.stride)
 
     def __len__(self):
-        return len(self.samples)
+        return len(self.window_indices)
 
     def __getitem__(self, idx):
-        input_ids, target_ids = self.samples[idx]
+
+        start = self.window_indices[idx]
+
+        input_ids, target_ids = build_input_target(self.token_stream, 
+                                                   start=start,
+                                                   context_length=self.context_length)
 
         return (
             torch.tensor(input_ids, dtype=torch.long),
