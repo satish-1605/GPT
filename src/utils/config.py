@@ -5,7 +5,7 @@ import torch
 class ModelConfig:
     
     vocab_size: int = 5000
-    context_length : int = 128
+    context_length : int = 512
 
     d_model: int = 256
     num_heads: int = 4
@@ -50,9 +50,9 @@ class ModelConfig:
 @dataclass
 class DataConfig:
     dataset_path : str = ("data/processed/fineweb_10k_clean.txt")
-    context_length: int = 128
-    stride:int = 128
-    batch_size : int = 16
+    context_length: int = 512
+    stride:int = 512
+    batch_size : int = 4
 
 @dataclass
 class OptimizerConfig:
@@ -66,16 +66,16 @@ class OptimizerConfig:
 
 @dataclass
 class SchedulerConfig:
-    warmup_steps: int = 100
+    warmup_steps: int = 500
     min_learning_rate: float = 3e-5
-    max_steps: int = 100
+    max_steps: int = 50000
 
 @dataclass
 class TrainingConfig:
 
     max_grad_norm: float = 1.0
 
-    epochs : int = 1
+    epochs : int = 15
     device : torch.device  = field(
         default_factory = lambda: (
         torch.device("cuda" if torch.cuda.is_available() else "cpu"

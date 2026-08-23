@@ -38,4 +38,4 @@ class ByteEncoder:
         Convert the byte-level representation back into a UTF-8 string.
         """
         byte_values = [self.byte_decoder[c] for c in text]
-        return bytes(byte_values).decode("utf-8")
+        return bytes(byte_values).decode("utf-8", errors="replace")

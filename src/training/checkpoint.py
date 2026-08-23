@@ -39,7 +39,7 @@ def load_checkpoint(
             f"Checkpoint not found : {path}"
         )
 
-    checkpoint = torch.load(path, map_location=device)
+    checkpoint = torch.load(path, map_location=device, weights_only=False)
     model.load_state_dict(
         checkpoint['model_state_dict']
     )
@@ -74,6 +74,7 @@ def load_model_checkpoint(
     checkpoint = torch.load(
         path,
         map_location=device,
+        weights_only=False
     )
 
     model.load_state_dict(

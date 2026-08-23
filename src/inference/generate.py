@@ -1,4 +1,4 @@
-from src.models.gpt import GPT2
+from src.models.gpt import GPT
 from src.utils.config import GPTConfig
 from src.training.checkpoint import load_model_checkpoint
 from src.datasets.clean import clean_document
@@ -10,7 +10,7 @@ import torch
 
 config = GPTConfig()
 tokenizer = BPETokenizer.from_pretrained(config.training.load_dir)
-model = GPT2(config)
+model = GPT(config)
 
 
 model = load_model_checkpoint(path=config.training.checkpoint_path,
