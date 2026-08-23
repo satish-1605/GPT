@@ -8,11 +8,11 @@ class FeedForward(nn.Module):
         """Initialize the component and its configuration."""
         super().__init__()
 
-        self.fc1 = nn.Linear(config.d_model, config.ff_hidden_dim, bias=config.bias)
+        self.fc1 = nn.Linear(config.model.d_model, config.model.ff_hidden_dim, bias=config.model.bias)
         self.activation = nn.GELU()
-        self.fc2 = nn.Linear(config.ff_hidden_dim, config.d_model, bias=config.bias)
+        self.fc2 = nn.Linear(config.model.ff_hidden_dim, config.model.d_model, bias=config.model.bias)
 
-        self.dropout = nn.Dropout(config.dropout)
+        self.dropout = nn.Dropout(config.model.dropout)
 
     def forward(self, x):
         """Run a forward pass through this component."""

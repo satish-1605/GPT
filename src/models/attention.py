@@ -7,21 +7,21 @@ class MultiHeadAttention(nn.Module):
     def __init__(self, config: GPTConfig):
         """Initialize the component and its configuration."""
         super().__init__()
-        self.num_heads = config.num_heads
+        self.num_heads = config.model.num_heads
 
-        assert config.d_model % self.num_heads == 0, (
+        assert config.model.d_model % self.num_heads == 0, (
             "d_model must be divisible by num_heads"
         )
 
-        self.head_dim = config.d_model // config.num_heads
+        self.head_dim = config.model.d_model // config.model.num_heads
 
-        self.wq = nn.Linear(config.d_model, config.d_model, bias=config.bias)
-        self.wk = nn.Linear(config.d_model, config.d_model, bias=config.bias)
-        self.wv = nn.Linear(config.d_model, config.d_model, bias=config.bias)
+        self.wq = nn.Linear(config.model.d_model, config.model.d_model, bias=config.model.bias)
+        self.wk = nn.Linear(config.model.d_model, config.model.d_model, bias=config.model.bias)
+        self.wv = nn.Linear(config.model.d_model, config.model.d_model, bias=config.model.bias)
 
-        self.out_proj = nn.Linear(config.d_model, config.d_model, bias=config.bias)
+        self.out_proj = nn.Linear(config.model.d_model, config.model.d_model, bias=config.model.bias)
 
-        self.dropout = nn.Dropout(config.dropout)
+        self.dropout = nn.Dropout(config.model.dropout)
 
     def split_heads(self, x):
         """

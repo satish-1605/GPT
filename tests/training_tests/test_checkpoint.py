@@ -4,7 +4,7 @@ import pytest
 from src.utils.config import GPTConfig
 from src.datasets.dataset import GPTDataset
 from src.datasets.dataloader import create_dataloader
-from src.models.gpt2 import GPT2
+from src.models.gpt import GPT2
 from src.training.optimizer import create_optimizer
 from src.training.checkpoint import save_checkpoint, load_checkpoint
 

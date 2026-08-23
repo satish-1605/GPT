@@ -11,13 +11,13 @@ from src.datasets.tokenize import CorpusTokenizer
 def get_train_val_test_loaders(config: GPTConfig):
 
     tokenizer = BPETokenizer.from_pretrained(
-        config.load_dir
+        config.training.load_dir
     )
 
     preprocessor = DatasetPreprocessor()
 
     documents = preprocessor.preprocess_corpus(
-        input_file=config.fineweb_dataset_path
+        input_file=config.data.dataset_path
     )
 
     train_docs, val_docs, test_docs = train_val_test_split(
@@ -42,20 +42,20 @@ def get_train_val_test_loaders(config: GPTConfig):
 
     train_dataset = GPTDataset(
         token_stream=train_stream,
-        context_length=config.context_length,
-        stride=config.stride,
+        context_length=config.data.context_length,
+        stride=config.data.stride,
     )
 
     val_dataset = GPTDataset(
         token_stream=val_stream,
-        context_length=config.context_length,
-        stride=config.stride,
+        context_length=config.data.context_length,
+        stride=config.data.stride,
     )
 
     test_dataset = GPTDataset(
         token_stream=test_stream,
-        context_length=config.context_length,
-        stride=config.stride,
+        context_length=config.data.context_length,
+        stride=config.data.stride,
     )
 
     # -------------------------
@@ -64,19 +64,19 @@ def get_train_val_test_loaders(config: GPTConfig):
 
     train_loader = create_dataloader(
         dataset=train_dataset,
-        batch_size=config.batch_size,
+        batch_size=config.data.batch_size,
         shuffle=True,
     )
 
     val_loader = create_dataloader(
         dataset=val_dataset,
-        batch_size=config.batch_size,
+        batch_size=config.data.batch_size,
         shuffle=False,
     )
 
     test_loader = create_dataloader(
         dataset=test_dataset,
-        batch_size=config.batch_size,
+        batch_size=config.data.batch_size,
         shuffle=False,
     )
 

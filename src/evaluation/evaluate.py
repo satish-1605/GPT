@@ -10,8 +10,8 @@ config = GPTConfig()
 model = GPT(config)
 
 model = load_model_checkpoint(model=model,
-                   path=config.checkpoint_path, 
-                   device= config.device)
+                   path=config.training.checkpoint_path, 
+                   device= config.training.device)
 
 def evaluate():
     """
@@ -26,7 +26,7 @@ def evaluate():
 
     test_loss = validate(loader=test_loader,
                         model=model,
-                        device=config.device)
+                        device=config.training.device)
 
     perplexity = compute_perplexity(loss=test_loss)
     print("=" * 50)

@@ -10,9 +10,9 @@ class LayerNorm(nn.Module):
     def __init__(self, config:GPTConfig):
         """Initialize the component and its configuration."""
         super().__init__()
-        self.gamma = nn.Parameter(torch.ones(config.d_model))
-        self.beta = nn.Parameter(torch.zeros(config.d_model))
-        self.eps = config.eps
+        self.gamma = nn.Parameter(torch.ones(config.model.d_model))
+        self.beta = nn.Parameter(torch.zeros(config.model.d_model))
+        self.eps = config.model.eps
 
     def forward(self, x):     
         """Run a forward pass through this component."""

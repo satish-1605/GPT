@@ -1,173 +1,167 @@
-# GPT-1 From Scratch
+# GPT From Scratch
 
-A complete implementation of **GPT-1 (Generative Pre-trained Transformer)** from scratch using **PyTorch**, following the original OpenAI paper **"Improving Language Understanding by Generative Pre-Training" (2018)**.
+A complete implementation of **GPT-1 and GPT-2-style decoder-only Transformer language models from scratch using PyTorch**.
 
-This repository demonstrates the complete pipeline of building a decoder-only Transformer language model, including tokenizer training, data preprocessing, model implementation, training, inference, and evaluation.
+This repository follows the core ideas introduced in OpenAI's original GPT work and progressively builds the system from tokenizer and data preprocessing through model architecture, training, inference, and evaluation.
 
-> **Note:** The objective of this project is to understand and implement GPT-1 from first principles rather than reproduce the original model's performance.
+> **Note:** The objective of this project is to understand and implement GPT architectures from first principles rather than reproduce the original GPT-1 or GPT-2 model performance.
 
 ---
 
-# Project Highlights
+## Project Highlights
 
 * Implemented GPT-1 decoder-only Transformer from scratch.
+* Extended the implementation toward a GPT-2-style architecture.
 * Built a custom **Byte Pair Encoding (BPE)** tokenizer.
-* Created a complete data preprocessing and loading pipeline.
+* Created reusable dataset and data-loading pipelines.
 * Implemented Multi-Head Self-Attention with causal masking.
-* Built decoder blocks with residual connections and Layer Normalization.
-* Trained the model on the TinyStories dataset.
-* Implemented multiple text generation strategies.
-* Evaluated the model using quantitative and qualitative metrics.
+* Implemented Transformer decoder blocks with residual connections and Layer Normalization.
+* Added AdamW optimization, learning-rate scheduling, and gradient clipping.
+* Implemented checkpoint saving and resume support.
+* Added multiple autoregressive text-generation strategies.
+* Evaluated models using validation loss, perplexity, and qualitative generation.
+* Designed the codebase to provide a foundation for future GPT-3-style scaling experiments.
 
 ---
 
-# Repository Structure
+# Project Evolution
+
+The project is developed progressively, moving from a small GPT-1 implementation toward GPT-2-style improvements.
 
 ```text
-GPT-1/
-│
-├── artifacts/
-│   └── tokenizer/
-│
-├── docs/
-│   ├── 01_project_overview.md
-│   ├── 02_dataset.md
-│   ├── 03_tokenizer.md
-│   ├── 04_data_pipeline.md
-│   ├── 05_model.md
-│   ├── 06_training.md
-│   ├── 07_inference.md
-│   └── 08_evaluation.md
-│
-├── scripts/
-│   └── train_tokenizer.py
-│
-├── src/
-│   ├── datasets/
-│   ├── tokenizer/
-│   ├── models/
-│   ├── trainer/
-│   ├── inference/
-│   ├── evaluation/
-│   ├── optim/
-│   ├── losses/
-│   └── utils/
-│
-├── tests/
-│
-├── train_pretrain.py
-└── README.md
+GPT-1
+ │
+ ├── Custom BPE Tokenizer
+ ├── TinyStories Dataset
+ ├── Decoder-only Transformer
+ ├── Causal Self-Attention
+ ├── Training Pipeline
+ └── Text Generation
+        │
+        ▼
+GPT-2
+ │
+ ├── Improved Data Pipeline
+ ├── GPT-2-style Architecture
+ ├── FineWeb-derived Data
+ ├── AdamW
+ ├── Learning-Rate Scheduling
+ ├── Gradient Clipping
+ ├── Checkpoint / Resume
+ ├── Multiple Sampling Strategies
+ └── Formal Evaluation
+        │
+        ▼
+Future GPT-3 Scaling
 ```
+
+The GPT-1 phase establishes the fundamental architecture and training pipeline. The GPT-2 phase then improves the data, architecture, optimization, and evaluation components while keeping the implementation understandable and practical for local experimentation.
 
 ---
 
 # Project Pipeline
 
+The overall workflow is:
+
 ```text
-TinyStories Dataset
-          │
-          ▼
+Dataset
+   │
+   ▼
 Text Cleaning
-          │
-          ▼
-BPE Tokenizer Training
-          │
-          ▼
+   │
+   ▼
+BPE Tokenizer
+   │
+   ▼
 Tokenization
-          │
-          ▼
-Train / Validation Split
-          │
-          ▼
-Sliding Window Dataset
-          │
-          ▼
+   │
+   ▼
+Train / Validation / Test Split
+   │
+   ▼
+Sliding-Window / Context Dataset
+   │
+   ▼
 DataLoader
-          │
-          ▼
-GPT-1 Model
-          │
-          ▼
+   │
+   ▼
+GPT Model
+   │
+   ▼
 Training
-          │
-          ▼
-Checkpoint Saving
-          │
-          ▼
+   │
+   ▼
+Checkpoint
+   │
+   ▼
 Inference
-          │
-          ▼
+   │
+   ▼
 Evaluation
 ```
 
 ---
 
-# GPT-1 Architecture
+# GPT Architecture
 
-The implemented model follows the original decoder-only Transformer architecture.
+Both implementations use the decoder-only Transformer concept.
 
 ```text
 Input Token IDs
-        │
-        ▼
+       │
+       ▼
 Token Embedding
-        │
-        ▼
-Positional Embedding
-        │
-        ▼
-Decoder Block × N
-        │
-        ▼
-Layer Normalization
-        │
-        ▼
+       │
+       ▼
+Positional Information
+       │
+       ▼
+Transformer Decoder Blocks
+       │
+       ▼
+Final Layer Normalization
+       │
+       ▼
 Linear Projection
-        │
-        ▼
+       │
+       ▼
 Vocabulary Logits
 ```
 
-Each decoder block contains:
+Each Transformer block contains:
 
-* Masked Multi-Head Self-Attention
-* Feed Forward Network (MLP)
+* Causal Multi-Head Self-Attention
+* Feed-Forward Network / MLP
 * Residual Connections
 * Layer Normalization
 
+The GPT-2 phase additionally incorporates GPT-2-style architectural and optimization improvements.
+
 ---
 
-# Dataset
+# GPT-1
 
-The project uses the **TinyStories** dataset.
+## Dataset
 
-Due to hardware limitations, a subset of **10,000 stories** was used for both tokenizer training and GPT-1 training.
+The GPT-1 implementation uses the **TinyStories** dataset.
 
-Dataset preprocessing includes:
+Due to local hardware constraints, a subset of:
+
+```text
+10,000 stories
+```
+
+was used for tokenizer training and model training.
+
+The preprocessing pipeline includes:
 
 * Text cleaning
-* Tokenization using BPE
-* Train/Validation split (80/20)
-* Sliding window sequence generation
+* BPE tokenization
+* 80/20 train-validation split
+* Sliding-window sequence generation
+* DataLoader construction
 
----
-
-# Tokenizer
-
-A custom **Byte Pair Encoding (BPE)** tokenizer was implemented from scratch.
-
-Features:
-
-* Vocabulary learning
-* Merge rule generation
-* Encoding
-* Decoding
-* Batch encoding/decoding
-* Vocabulary serialization
-
----
-
-# Training Configuration
+## Training Configuration
 
 | Parameter        |         Value |
 | ---------------- | ------------: |
@@ -177,111 +171,240 @@ Features:
 | Batch Size       |            16 |
 | Learning Rate    |          3e-4 |
 | Optimizer        |         AdamW |
-| Loss Function    | Cross Entropy |
+| Loss             | Cross Entropy |
 | Validation Split |           20% |
+
+## GPT-1 Results
+
+The best recorded validation metrics were approximately:
+
+```text
+Validation Loss ≈ 5.4
+Perplexity       = 258.99
+```
+
+The model successfully learned basic:
+
+* English sentence structure
+* Story continuation
+* Grammar patterns
+* Children's story patterns
+* Next-token prediction
+
+Because the model was trained on only 10,000 stories for four epochs, longer generations can exhibit repetition, reduced coherence, limited vocabulary diversity, and BPE artifacts.
+
+---
+
+# GPT-2
+
+The GPT-2 phase extends the original implementation toward a more complete GPT-2-style pretraining system.
+
+## Dataset
+
+The GPT-2 phase moved from the smaller TinyStories experiment toward a **FineWeb-derived corpus**.
+
+The data pipeline follows:
+
+```text
+Corpus
+  ↓
+Cleaning
+  ↓
+Train / Validation / Test Split
+  ↓
+BPE Tokenization
+  ↓
+Token Streams
+  ↓
+Context Windows
+  ↓
+DataLoader
+```
+
+The pipeline is designed to be reusable for larger training corpora.
+
+## Model Configuration
+
+The local GPT-2-style experiment used approximately:
+
+| Parameter           | Value |
+| ------------------- | ----: |
+| Vocabulary Size     | 5,000 |
+| Context Length      |   128 |
+| Embedding Dimension |   256 |
+| Attention Heads     |     4 |
+| Transformer Layers  |     6 |
+| FFN Dimension       | 1,024 |
+| Dropout             |   0.1 |
+| Batch Size          |    16 |
+
+## Optimization
+
+The GPT-2 training pipeline uses:
+
+| Parameter          | Value |
+| ------------------ | ----: |
+| Optimizer          | AdamW |
+| Learning Rate      |  3e-4 |
+| Weight Decay       |   0.1 |
+| β₁                 |   0.9 |
+| β₂                 |  0.95 |
+| Warmup Steps       |   100 |
+| Minimum LR         |  3e-5 |
+| Gradient Clip Norm |   1.0 |
+
+The training system also supports:
+
+* Validation during training
+* Best-checkpoint selection
+* Global-step tracking
+* Checkpoint resume
+* Learning-rate scheduling
+* Gradient clipping
+
+## GPT-2 Training Result
+
+The final recorded local training run reached:
+
+```text
+Global Steps = 3,466
+Train Loss   = 5.6355
+Val Loss     = 5.1117
+```
+
+Independent evaluation produced:
+
+```text
+Validation Loss = 5.1459
+Perplexity      = 171.7320
+```
+
+These results are intended as an engineering and implementation baseline rather than a reproduction of the original GPT-2 benchmark performance.
+
+The model is considerably smaller and was trained on far less data and compute than the original GPT-2 models.
 
 ---
 
 # Inference
 
-The repository supports multiple decoding strategies:
+Both GPT implementations support autoregressive text generation.
 
-* Greedy Sampling
-* Temperature Sampling
-* Top-k Sampling
-* Top-p (Nucleus) Sampling
+The generation process is:
 
-Generation is performed autoregressively by predicting one token at a time until either:
+```text
+Prompt
+  ↓
+Tokenizer
+  ↓
+Token IDs
+  ↓
+GPT Model
+  ↓
+Logits
+  ↓
+Sampling
+  ↓
+Next Token
+  ↓
+Append Token
+  ↓
+Repeat
+  ↓
+Decode
+  ↓
+Generated Text
+```
 
-* `<EOS>` is generated, or
-* the maximum sequence length is reached.
+Supported decoding strategies include:
+
+* **Greedy Sampling**
+* **Temperature Sampling**
+* **Top-k Sampling**
+* **Top-p / Nucleus Sampling**
+
+Generation stops when an end-of-text token is produced or the configured generation limit is reached.
 
 ---
 
 # Evaluation
 
-The model was evaluated using both quantitative and qualitative approaches.
+The project uses both quantitative and qualitative evaluation.
 
-### Quantitative Evaluation
+## Quantitative Evaluation
+
+The primary metrics are:
 
 * Validation Loss
 * Perplexity
 
-### Qualitative Evaluation
+Perplexity is calculated as:
 
-Text generation using multiple prompts with different sampling strategies.
+```text
+Perplexity = exp(loss)
+```
+
+Lower validation loss and perplexity indicate better next-token prediction on the evaluation data.
+
+## Qualitative Evaluation
+
+Generated text is evaluated using different prompts and sampling strategies to examine:
+
+* Fluency
+* Coherence
+* Repetition
+* Diversity
+* Prompt continuation
+* Sampling behavior
 
 ---
 
-# Results
+# Results Summary
 
-## Best Validation Loss
+| Model | Dataset         | Steps / Epochs | Validation Loss | Perplexity |
+| ----- | --------------- | -------------: | --------------: | ---------: |
+| GPT-1 | TinyStories     |       4 epochs |           ≈ 5.4 |     258.99 |
+| GPT-2 | FineWeb-derived |    3,466 steps |          5.1459 |   171.7320 |
 
-```text
-≈ 5.4
-```
+These results should be interpreted within the context of each experiment's dataset size, model size, tokenizer, training duration, and available compute.
 
-## Perplexity
-
-```text
-258.99
-```
-
-## Observations
-
-The model successfully learned:
-
-* English sentence structure
-* Story continuation
-* Basic grammar
-* Children's story patterns
-* Next-token prediction
-
-Because the model was trained on only **10,000 stories** for **4 epochs**, longer generations occasionally exhibit:
-
-* Repetition
-* Reduced coherence
-* Limited vocabulary diversity
-* BPE tokenization artifacts
-
-These limitations are expected given the constrained training setup.
+They are not directly comparable to the original GPT-1 or GPT-2 benchmark results.
 
 ---
 
 # How to Run
 
-## 1. Clone the repository
+## 1. Clone the Repository
 
 ```bash
-git clone https://github.com/<your-username>/GPT-1-From-Scratch.git
-cd GPT-1-From-Scratch
+git clone https://github.com/<your-username>/GPT-From-Scratch.git
+cd GPT-From-Scratch
 ```
 
-## 2. Install dependencies
+## 2. Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-## 3. Train the tokenizer
+## 3. Train the Tokenizer
 
 ```bash
 python scripts/train_tokenizer.py
 ```
 
-## 4. Train GPT-1
+## 4. Train the Model
 
 ```bash
 python train_pretrain.py
 ```
 
-## 5. Generate text
+## 5. Generate Text
 
 ```bash
 python src/inference/generate.py
 ```
 
-## 6. Evaluate the model
+## 6. Evaluate the Model
 
 ```bash
 python src/evaluation/evaluate.py
@@ -291,40 +414,76 @@ python src/evaluation/evaluate.py
 
 # Documentation
 
-Detailed documentation is available in the `docs/` directory.
+Detailed implementation notes are available in the `docs/` directory.
 
-| Chapter | Description      |
-| ------- | ---------------- |
-| 01      | Project Overview |
-| 02      | Dataset          |
-| 03      | Tokenizer        |
-| 04      | Data Pipeline    |
-| 05      | GPT-1 Model      |
-| 06      | Training         |
-| 07      | Inference        |
-| 08      | Evaluation       |
+| Chapter | Description        |
+| ------- | ------------------ |
+| 01      | Project Overview   |
+| 02      | Dataset            |
+| 03      | Tokenizer          |
+| 04      | Data Pipeline      |
+| 05      | Model Architecture |
+| 06      | Training           |
+| 07      | Inference          |
+| 08      | Evaluation         |
+| 09      | Results            |
 
 ---
 
 # Future Improvements
 
-* Train on the complete TinyStories dataset.
-* Increase the number of training epochs.
-* Scale to GPT-2 architecture.
-* Implement weight tying.
-* Add KV Cache for faster inference.
+The next stages of the project will focus on scaling and improving the existing implementation.
+
+* Train on larger and more diverse corpora.
+* Scale the model toward GPT-3-style configurations.
+* Increase context length.
+* Investigate scaling laws.
+* Implement weight tying where appropriate.
+* Add KV caching for faster inference.
 * Implement Flash Attention.
-* Add mixed precision (FP16/BF16) training.
+* Add mixed-precision FP16/BF16 training.
 * Support distributed and multi-GPU training.
-* Fine-tune on downstream NLP tasks.
+* Improve checkpoint management.
+* Add downstream NLP evaluation.
+* Experiment with instruction tuning and alignment.
+
+---
+
+# Learning Goals
+
+This project is intended to provide a practical understanding of how modern autoregressive language models are constructed.
+
+The implementation covers the complete lifecycle:
+
+```text
+Tokenizer
+   ↓
+Data
+   ↓
+Transformer
+   ↓
+Optimization
+   ↓
+Training
+   ↓
+Checkpointing
+   ↓
+Inference
+   ↓
+Evaluation
+```
+
+The progression from GPT-1 to GPT-2 is also intended to demonstrate that improvements in language-model capability are not determined by architecture alone. Model size, training data, optimization, training tokens, context length, and compute all contribute to the final result.
 
 ---
 
 # References
 
 1. Radford, A., et al. (2018). *Improving Language Understanding by Generative Pre-Training.*
-2. Vaswani, A., et al. (2017). *Attention Is All You Need.*
-3. TinyStories Dataset.
+2. Radford, A., et al. (2019). *Language Models are Unsupervised Multitask Learners.*
+3. Vaswani, A., et al. (2017). *Attention Is All You Need.*
+4. TinyStories Dataset.
+5. FineWeb Dataset.
 
 ---
 

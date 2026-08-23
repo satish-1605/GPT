@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from src.models.gpt2 import GPT2
+from src.models.gpt import GPT2
 from src.utils.config import GPTConfig
 
 from src.training.optimizer import create_optimizer

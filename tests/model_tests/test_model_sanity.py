@@ -1,5 +1,5 @@
 import torch 
-from src.models.gpt2 import GPT2
+from src.models.gpt import GPT2
 from src.utils.config import GPTConfig
 def test_gpt2_sanity():
 

@@ -38,16 +38,16 @@ def train_one_epoch(
 
         grad_norm = clip_gradients(
             model,
-            config.max_grad_norm,
+            config.training.max_grad_norm,
         )
 
         if max_steps is not None:
             lr = get_learning_rate(
                 step=global_step,
                 max_steps=max_steps,
-                learning_rate=config.learning_rate,
-                warmup_steps=config.warmup_steps,
-                min_learning_rate=config.min_learning_rate,
+                learning_rate=config.optimizer.learning_rate,
+                warmup_steps=config.scheduler.warmup_steps,
+                min_learning_rate=config.scheduler.min_learning_rate,
             )
 
             for param_group in optimizer.param_groups:

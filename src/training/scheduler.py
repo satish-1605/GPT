@@ -1,13 +1,5 @@
 import math
 
-# Learning Rate
-#      │
-# max  │        /──────────\
-#      │       /             \
-#      │      /               \
-# min  │_____/                 \____
-#      └──────────────────────────────→ steps
-#           warmup       cosine decay
 def get_learning_rate(
         step:int,
         max_steps :int,

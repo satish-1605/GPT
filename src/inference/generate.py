@@ -1,4 +1,4 @@
-from src.models.gpt2 import GPT2
+from src.models.gpt import GPT2
 from src.utils.config import GPTConfig
 from src.training.checkpoint import load_model_checkpoint
 from src.datasets.clean import clean_document
@@ -9,13 +9,13 @@ from src.inference.sampling import (greedy_sampling, temperature_sampling, top_k
 import torch
 
 config = GPTConfig()
-tokenizer = BPETokenizer.from_pretrained(config.load_dir)
+tokenizer = BPETokenizer.from_pretrained(config.training.load_dir)
 model = GPT2(config)
 
 
-model = load_model_checkpoint(path=config.checkpoint_path,
+model = load_model_checkpoint(path=config.training.checkpoint_path,
                              model= model,
-                             device = config.device)
+                             device = config.training.device)
 
 def generate(prompt,
              max_new_tokens = 100,
@@ -46,7 +46,7 @@ def generate(prompt,
 
             input_ids = torch.tensor(context_ids,
                                     dtype=torch.long, 
-                                    device=config.device).unsqueeze(0)
+                                    device=config.training.device).unsqueeze(0)
 
             
             logits = model(input_ids)

@@ -27,7 +27,7 @@ def main():
     preprocessor = DatasetPreprocessor()
 
     documents = preprocessor.preprocess_corpus(
-        input_file=config.fineweb
+        input_file=config.data.dataset_path
     )
 
     print(f"Documents loaded : {len(documents):,}")
@@ -54,7 +54,7 @@ def main():
     # --------------------------------------------------
 
     trainer = GPT2BPETrainer(
-        vocab_size=config.vocab_size
+        vocab_size=config.model.vocab_size
     )
 
     # --------------------------------------------------
@@ -62,13 +62,13 @@ def main():
     # --------------------------------------------------
 
     print("\nStarting GPT-2 BPE tokenizer training...")
-    print(f"Target vocabulary : {config.vocab_size}")
+    print(f"Target vocabulary : {config.model.vocab_size}")
     print("-" * 60)
 
     start = time.time()
 
     trainer.fit(
-        output_dir=config.load_dir,
+        output_dir=config.training.load_dir,
         corpus=train_docs,
         verbose=True,
         log_every=100
@@ -101,7 +101,7 @@ def main():
 
     print(
         f"Saved to         : "
-        f"{Path(config.load_dir).resolve()}"
+        f"{Path(config.training.load_dir).resolve()}"
     )
 
     print("=" * 60)
