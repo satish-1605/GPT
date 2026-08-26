@@ -71,7 +71,7 @@ def main():
         output_dir=config.training.load_dir,
         corpus=train_docs,
         verbose=True,
-        log_every=100
+        log_every=1000
     )
 
     training_time = time.time() - start

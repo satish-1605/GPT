@@ -4,13 +4,13 @@ import torch
 @dataclass
 class ModelConfig:
     
-    vocab_size: int = 5000
-    context_length : int = 512
+    vocab_size: int = 32000
+    context_length : int = 1024
 
-    d_model: int = 256
-    num_heads: int = 4
-    num_layers: int = 6
-    ff_hidden_dim: int = 1024
+    d_model: int = 1024
+    num_heads: int = 16
+    num_layers: int = 24
+    ff_hidden_dim: int = 4096
 
     dropout: float = 0.1
     eps : float = 1e-5
@@ -49,10 +49,10 @@ class ModelConfig:
 
 @dataclass
 class DataConfig:
-    dataset_path : str = ("data/processed/fineweb_10k_clean.txt")
-    context_length: int = 512
-    stride:int = 512
-    batch_size : int = 4
+    dataset_path : str = ("data/processed/fineweb_100k_clean.txt")
+    context_length: int = 1024
+    stride:int = 1024
+    batch_size : int = 2
 
 @dataclass
 class OptimizerConfig:
@@ -68,21 +68,21 @@ class OptimizerConfig:
 class SchedulerConfig:
     warmup_steps: int = 500
     min_learning_rate: float = 3e-5
-    max_steps: int = 50000
+    max_steps: int = 30000
 
 @dataclass
 class TrainingConfig:
 
     max_grad_norm: float = 1.0
 
-    epochs : int = 15
+    epochs : int = 4
     device : torch.device  = field(
         default_factory = lambda: (
         torch.device("cuda" if torch.cuda.is_available() else "cpu"
                      )
         ))
 
-    checkpoint_path: str = ("artifacts/gpt3mini_checkpoints/best_checkpoint.pt")
+    checkpoint_path: str = ("artifacts/gpt3large_checkpoints/best_checkpoint.pt")
     load_dir : str = "artifacts/tokenizer"
 
 @dataclass
@@ -161,8 +161,24 @@ def gpt3_small_config() -> GPTConfig:
         )
     )
 
+def gpt3_large_config() -> GPTConfig:
+
+    return GPTConfig(
+        model=ModelConfig(
+            vocab_size=5000,
+            context_length=1024,
+            d_model=1024,
+            num_heads=16,
+            num_layers=24,
+            ff_hidden_dim=4096,
+            dropout=0.1,
+            eps=1e-5
+        )
+    )
+
 GPT3_MODELS = {
     "gpt2_baseline": gpt2_baseline_config,
     "gpt3_mini": gpt3_mini_config,
     "gpt3_small": gpt3_small_config,
+    "gpt3_large": gpt3_large_config
 }

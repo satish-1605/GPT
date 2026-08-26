@@ -1,6 +1,6 @@
 {
   "tokenizer_type": "GPT2BPE",
-  "vocab_size": 5000,
+  "vocab_size": 32000,
   "pre_tokenizer": "GPT2",
   "byte_level": true,
   "special_tokens": [

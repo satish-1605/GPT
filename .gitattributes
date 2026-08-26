@@ -1,0 +1,4 @@
+*.pt filter=lfs diff=lfs merge=lfs -text
+data/processed/tokenizer_train.txt filter=lfs diff=lfs merge=lfs -text
+data/processed/fineweb_100k_clean.txt filter=lfs diff=lfs merge=lfs -text
+data/raw/fineweb_100k.txt filter=lfs diff=lfs merge=lfs -text
