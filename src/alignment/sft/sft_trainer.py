@@ -114,12 +114,15 @@ class SFTTrainer:
         ):
             logits = self.model(input_ids)
 
+            shifted_logits = logits[:, :-1, :]
+            shifted_labels = labels[:, 1:]
+
             loss = self.loss_fn(
-                logits.reshape(
+                shifted_logits.reshape(
                     -1,
-                    logits.size(-1)
+                    shifted_logits.size(-1)
                 ),
-                labels.reshape(-1)
+                shifted_labels.reshape(-1)
             )
 
         return loss

@@ -4,7 +4,7 @@ from huggingface_hub import snapshot_download
 
 REPO_ID = "Satish1102/gpt-300m-base"
 LOCAL_DIR = Path(
-    "artifacts/gpt-300m-base"
+    "sft"
 )
 
 def main():

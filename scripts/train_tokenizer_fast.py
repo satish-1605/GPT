@@ -10,6 +10,7 @@ from tokenizers.trainers import BpeTrainer
 from src.datasets.preprocess import DatasetPreprocessor
 from src.datasets.split import train_val_test_split
 from src.utils.config import GPTConfig
+from tokenizers.decoders import ByteLevel as ByteLevelDecoder
 
 
 config = GPTConfig()
@@ -98,6 +99,8 @@ def main():
     tokenizer.pre_tokenizer = ByteLevel(
         add_prefix_space=False
     )
+
+    tokenizer.decoder = ByteLevelDecoder()
 
     # --------------------------------------------------
     # 5. Trainer
