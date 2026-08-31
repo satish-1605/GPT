@@ -36,13 +36,18 @@ class SFTTrainer:
             config.use_amp and self.device.type == "cuda"
         )
 
-        self.scaler = torch.amp.GradScaler("cuda", enabled=self.use_amp)
+        if self.use_amp:
+            amp_dtype = getattr(torch, config.amp_dtype)
+            self.amp_dtype = amp_dtype
+            self.scaler = torch.amp.GradScaler("cuda",enabled=True)
+        else:
+            self.amp_dtype = torch.float32
+            self.scaler = None
 
         self.global_step = 0
         self.best_val_loss = float("inf")
 
         self.checkpoint_dir = Path(config.checkpoint_dir)
-
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
     def _compute_loss(self, batch):
@@ -50,9 +55,7 @@ class SFTTrainer:
 
         labels = batch['labels'].to(self.device, non_blocking = True)
 
-        amp_dtype = getattr(torch, self.config.amp_dtype)
-
-        with torch.autocast(device_type=self.device, dtype= amp_dtype, enabled=self.use_amp):
+        with torch.autocast(device_type=self.device, dtype= self.amp_dtype, enabled=self.use_amp):
             logits = self.model(input_ids)
             loss = self.loss_fn(logits.reshape(-1, logits.size(-1)), labels.reshape(-1))
 
@@ -120,15 +123,27 @@ class SFTTrainer:
         print(f"Max Steps :{self.config.max_steps:,}")
         print(f"Learning Rate :{self.config.learning_rate}")
         print(f"Batch Size :{self.config.batch_size}")
+        print(f"AMP: {self.use_amp}")
         print("=" * 70)
+
+        steps_per_epoch = len(self.train_loader)
+        print(f"Steps / Epoch : {steps_per_epoch:,}")
 
         train_iterator = iter(self.train_loader)
 
         running_loss = 0.0
-        while self.global_step < self.config.max_steps:
+        running_steps = 0
+
+        current_epoch = (self.global_step // steps_per_epoch) + 1
+
+        while (self.global_step < self.config.max_steps and current_epoch <= self.config.epochs):
             try:
                 batch = next(train_iterator)
             except StopIteration:
+                current_epoch += 1
+                if current_epoch > self.config.epochs:
+                    break
+
                 train_iterator = iter(self.train_loader)
                 batch = next(train_iterator)
 
@@ -155,32 +170,27 @@ class SFTTrainer:
             self.global_step +=1
 
             running_loss += loss.item()
+            running_steps += 1
 
             if (self.global_step % self.config.log_interval == 0):
-                avg_loss = (running_loss / self.config.log_interval)
+                train_loss  = (running_loss / running_steps)
+                val_loss = self.evaluate()
                 lr = self.optimizer.param_groups[0]['lr']
 
                 print(
-                    f"Step "
-                    f"{self.global_step:>7,} | "
-                    f"Train loss: "
-                    f"{avg_loss:.4f} | "
+                    f"Epoch [{current_epoch}/"
+                    f"{self.config.epochs}] | "
+                    f"Step {self.global_step:,} | "
+                    f"Train Loss: {train_loss:.4f} | "
+                    f"Val Loss: {val_loss:.4f} | "
                     f"LR: {lr:.2e}"
                 )
 
                 running_loss = 0.0
-
-            if (self.global_step % self.config.log_interval == 0):
-                val_loss = self.evaluate()
-                print(
-                    f"Step "
-                    f"{self.global_step:>7,} | "
-                    f"Val Loss: "
-                    f"{val_loss:.4f}"
-                )
+                running_steps = 0
 
                 if val_loss < self.best_val_loss:
-                    self.best_val_loss = val_loss
+                    self.best_val_loss = (val_loss)
 
                     best_path = (self.checkpoint_dir / "sft_best.pt")
                     self.save_checkpoint(best_path, val_loss)
@@ -188,6 +198,7 @@ class SFTTrainer:
                         f"Best Checkpoit saved: "
                         f"{best_path}"
                     )
+                    
             if (self.global_step % self.config.save_interval == 0):
                 checkpoint_path = (self.checkpoint_dir / f"sft_step_{self.global_step}.pt")
 

@@ -27,18 +27,18 @@ class SFTConfig:
     min_lr_ratio: float = 0.1
 
     # Data
-    batch_size: int = 2
+    batch_size: int = 10
     max_length: int = 1024
     num_workers: int = 0
-    max_steps: int =10
+    max_steps: int =2
 
 
     # Evaluation
-    eval_interval: int = 500
-    log_interval: int = 100
+    eval_interval: int = 10
+    log_interval: int = 10
 
     # Checkpointing
-    save_interval: int = 1000
+    save_interval: int = 10
     save_best: bool = True
 
     # Mixed precision

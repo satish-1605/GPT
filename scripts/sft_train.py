@@ -13,7 +13,7 @@ def main():
 
     config = SFTConfig()
 
-    device = torch.device(config.device)
+    device = config.device
 
     # Load tokenizer
     tokenizer = HFTokenizer(
@@ -61,6 +61,7 @@ def main():
     model.load_state_dict(
         checkpoint["model_state_dict"]
     )
+    print("Base GPT checkpoint loaded successfully.")
 
     # Trainer
     trainer = SFTTrainer(
