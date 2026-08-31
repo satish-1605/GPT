@@ -1,0 +1,233 @@
+from pathlib import Path
+import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader
+
+class SFTTrainer:
+    def __init__(self, 
+                 model, 
+                 train_loader:DataLoader, 
+                 val_loader:DataLoader, 
+                 config):
+        self.model = model
+        self.train_loader = train_loader
+        self.val_loader = val_loader
+        self.config = config
+
+        self.device = config.device
+        self.model.to(self.device)
+
+        self.optimizer = torch.optim.AdamW(
+            self.model.parameters(),
+            lr = config.learning_rate,
+            weight_decay= config.weight_decay,
+            betas= config.betas
+            )
+
+        self.schedular = torch.optim.lr_scheduler.CosineAnnealingLR(
+            self.optimizer,
+            T_max= config.max_steps,
+            eta_min= config.learning_rate * config.min_lr_ratio
+        )
+
+        self.loss_fn = nn.CrossEntropyLoss(ignore_index=-100)
+
+        self.use_amp = (
+            config.use_amp and self.device.type == "cuda"
+        )
+
+        self.scaler = torch.amp.GradScaler("cuda", enabled=self.use_amp)
+
+        self.global_step = 0
+        self.best_val_loss = float("inf")
+
+        self.checkpoint_dir = Path(config.checkpoint_dir)
+
+        self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
+
+    def _compute_loss(self, batch):
+        input_ids = batch['input_ids'].to(self.device, non_blocking = True)
+
+        labels = batch['labels'].to(self.device, non_blocking = True)
+
+        amp_dtype = getattr(torch, self.config.amp_dtype)
+
+        with torch.autocast(device_type=self.device, dtype= amp_dtype, enabled=self.use_amp):
+            logits = self.model(input_ids)
+            loss = self.loss_fn(logits.reshape(-1, logits.size(-1)), labels.reshape(-1))
+
+        return loss
+
+    @torch.no_grad()
+    def evaluate(self):
+        self.model.eval()
+        total_loss = 0
+        batches = 0
+
+        for batch in self.val_loader:
+            loss = self._compute_loss(batch)
+            total_loss += loss.item()
+            batches += 1
+
+        self.model.train()
+        if batches == 0:
+            return float("inf")
+
+        return total_loss / batches
+
+    def save_checkpoint(self, path, val_loss=None):
+        checkpoint = {
+            "model_state_dict" : self.model.state_dict(),
+            "optimizer_state_dict": self.optimizer.state_dict(),
+            "schedular_state_dict" : self.schedular.state_dict(),
+            "global_step": self.global_step,
+            "best_val_loss" : self.best_val_loss
+        }
+
+        if self.use_amp:
+            self.checkpoint["scaler_state_dict"] = (self.scaler.state_dict()) 
+
+        if val_loss is not None:
+            checkpoint['val_loss'] = val_loss
+
+        torch.save(checkpoint, path)
+
+    def load_checkpoint(self, path):
+        checkpoint = torch.load(path, map_location=self.device, weights_only=False)
+
+        self.model.load_state_dict(checkpoint['model_state_dict'])
+        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        self.schedular.load_state_dict(checkpoint['schedular_state_dict'])
+        self.global_step = checkpoint['global_step']
+        self.best_val_loss = checkpoint.get("best_val_loss", float("inf"))
+
+        if (self.use_amp and "scaler_state_dict" in checkpoint):
+            self.scaler.load_state_dict(checkpoint['scaler_state_dict'])
+
+        print(
+            f"Resumed from step "
+            f"{self.global_step}"
+            )
+
+    def train(self):
+        self.model.train()
+
+        print("=" * 70)
+        print("SFT TRAINING")
+        print("=" * 70)
+
+        print(f"Device :{self.device}")
+        print(f"Max Steps :{self.config.max_steps:,}")
+        print(f"Learning Rate :{self.config.learning_rate}")
+        print(f"Batch Size :{self.config.batch_size}")
+        print("=" * 70)
+
+        train_iterator = iter(self.train_loader)
+
+        running_loss = 0.0
+        while self.global_step < self.config.max_steps:
+            try:
+                batch = next(train_iterator)
+            except StopIteration:
+                train_iterator = iter(self.train_loader)
+                batch = next(train_iterator)
+
+            self.optimizer.zero_grad(set_to_none=True)
+
+            loss = self._compute_loss(batch)
+
+            if self.use_amp:
+                self.scaler.scale(loss).backward()
+
+                self.scaler.unscale_(self.optimizer)
+
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.config.max_grad_norm)
+
+                self.scaler.step(self.optimizer)
+                self.scaler.update()
+            else:
+                loss.backward()
+
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.config.max_grad_norm)
+                self.optimizer.step()
+
+            self.schedular.step()
+            self.global_step +=1
+
+            running_loss += loss.item()
+
+            if (self.global_step % self.config.log_interval == 0):
+                avg_loss = (running_loss / self.config.log_interval)
+                lr = self.optimizer.param_groups[0]['lr']
+
+                print(
+                    f"Step "
+                    f"{self.global_step:>7,} | "
+                    f"Train loss: "
+                    f"{avg_loss:.4f} | "
+                    f"LR: {lr:.2e}"
+                )
+
+                running_loss = 0.0
+
+            if (self.global_step % self.config.log_interval == 0):
+                val_loss = self.evaluate()
+                print(
+                    f"Step "
+                    f"{self.global_step:>7,} | "
+                    f"Val Loss: "
+                    f"{val_loss:.4f}"
+                )
+
+                if val_loss < self.best_val_loss:
+                    self.best_val_loss = val_loss
+
+                    best_path = (self.checkpoint_dir / "sft_best.pt")
+                    self.save_checkpoint(best_path, val_loss)
+                    print(
+                        f"Best Checkpoit saved: "
+                        f"{best_path}"
+                    )
+            if (self.global_step % self.config.save_interval == 0):
+                checkpoint_path = (self.checkpoint_dir / f"sft_step_{self.global_step}.pt")
+
+                self.save_checkpoint(checkpoint_path)
+                print(
+                        f"Checkpoint saved: "
+                        f"{checkpoint_path}"
+                    )
+
+        final_path = (self.checkpoint_dir / "sft_final.pt")
+        self.save_checkpoint(final_path, self.best_val_loss)
+
+        print("=" * 70)
+        print("SFT TRAINING COMPLETE")
+        print("=" * 70)
+
+        print(
+            f"Final step      : "
+            f"{self.global_step:,}"
+        )
+
+        print(
+            f"Best val loss   : "
+            f"{self.best_val_loss:.4f}"
+        )
+
+        print(
+            f"Final checkpoint: "
+            f"{final_path}"
+        )
+
+
+    
+
+
+
+
+
+
+
+
+
+        

@@ -18,7 +18,10 @@ class BPETokenizer:
         self.bpe = BPE(merges)
         self.vocabulary = Vocabulary(vocabulary_tokens)
 
-        self.special_tokens = ["<|endoftext|>"]
+        self.special_tokens = [
+                "<|endoftext|>",
+                "<|padding|>"
+            ]
 
         self.special_token_to_id = {}
 
@@ -26,6 +29,10 @@ class BPETokenizer:
             token_id = self.vocabulary.add_token(special_token)
 
             self.special_token_to_id[special_token] = token_id
+            
+        self.pad_token_id = self.special_token_to_id[
+            "<|padding|>"
+        ]
 
     @classmethod
     def from_pretrained(cls, load_dir: str | Path):

@@ -4,13 +4,6 @@ from pathlib import Path
 import json
 import time
 
-SPECIAL_TOKENS = [
-    "<PAD>",
-    "<UNK>",
-    "<BOS>",
-    "<EOS>",
-]
-
 
 class BPETrainer:
     """
