@@ -66,8 +66,6 @@ def generate(model, tokenizer, prompt, config,
 
     response_ids = generated_ids[0, input_ids.size(1):].tolist()
     response = tokenizer.decode(response_ids)
-    print("Generated token IDs:", generated_ids[0].tolist())
-    print("Generated token count:", generated_ids.size(1) - input_ids.size(1))
     return response
 
 def main():
@@ -95,7 +93,7 @@ def main():
     print(f"Device: {sft_config.device}")
     print("=" * 70)
 
-    instruction = ("Explain why drinking water is important.")
+    instruction = ("Why can camels survive for long without water?")
     input = ""
     prompt = format_prompt(instruction, input)
 
