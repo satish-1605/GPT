@@ -27,7 +27,7 @@ class SFTConfig:
 
     gradient_accumulation_steps: int = 1
 
-    max_steps: int = 5
+    max_steps: int = 10000
 
 
     # ==========================================================
@@ -40,8 +40,7 @@ class SFTConfig:
 
     min_lr_ratio: float = 0.1
 
-    scheduler_max_steps: int = 5
-
+    scheduler_max_steps: int = 10000
 
     # ==========================================================
     # Data
@@ -58,9 +57,9 @@ class SFTConfig:
     # Evaluation / Logging
     # ==========================================================
 
-    eval_interval: int = 10
+    eval_interval: int = 500
 
-    log_interval: int = 1
+    log_interval: int = 500
 
 
     # ==========================================================

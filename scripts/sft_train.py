@@ -66,10 +66,8 @@ def main():
     print("Loading Hugging Face tokenizer...")
 
     tokenizer = AutoTokenizer.from_pretrained(
-        config.model_name
+        config.model_name,
     )
-    tokenizer.model_max_length = config.max_length
-
     # GPT-2 does not define a PAD token.
     # Use EOS as PAD.
     tokenizer.pad_token = tokenizer.eos_token
