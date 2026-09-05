@@ -23,3 +23,4 @@ def calculate_loss(
     criterion = nn.CrossEntropyLoss()
     loss = criterion(logits, target_ids)
     return loss
+

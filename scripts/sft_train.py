@@ -1,44 +1,121 @@
-from pathlib import Path
-
 import torch
+
 from torch.utils.data import DataLoader
+
+from transformers import (
+AutoTokenizer,
+GPT2LMHeadModel,
+)
 
 from src.alignment.sft.sft_config import SFTConfig
 from src.alignment.sft.instruction_dataset import InstructionDataset
-from src.tokenizer.hf_tokenizer import HFTokenizer
-from src.models.gpt import GPT
-from src.utils.config import GPTConfig
 from src.alignment.sft.sft_trainer import SFTTrainer
-
 
 def main():
 
+
+    # ==================================================
+    # Configuration
+    # ==================================================
+
     config = SFTConfig()
 
-    device = torch.device(config.device)
+    device = torch.device(
+        config.device
+    )
+
+    print("=" * 70)
+    print("SFT TRAINING")
+    print("=" * 70)
+
+    print(
+        f"Device        : {device}"
+    )
+
+    print(
+        f"Model         : {config.model_name}"
+    )
+
+    print(
+        f"Max steps     : "
+        f"{config.max_steps:,}"
+    )
+
+    print(
+        f"Batch size    : "
+        f"{config.batch_size}"
+    )
+
+    print(
+        f"Learning rate : "
+        f"{config.learning_rate}"
+    )
+
+    print(
+        f"Max length    : "
+        f"{config.max_length}"
+    )
+
+    print("=" * 70)
 
     # ==================================================
     # Tokenizer
     # ==================================================
 
-    tokenizer = HFTokenizer(
-        config.tokenizer_path
+    print()
+    print("Loading Hugging Face tokenizer...")
+
+    tokenizer = AutoTokenizer.from_pretrained(
+        config.model_name
+    )
+    tokenizer.model_max_length = config.max_length
+
+    # GPT-2 does not define a PAD token.
+    # Use EOS as PAD.
+    tokenizer.pad_token = tokenizer.eos_token
+
+    print(
+        f"Tokenizer vocab size: "
+        f"{len(tokenizer):,}"
+    )
+
+    print(
+        f"EOS token ID: "
+        f"{tokenizer.eos_token_id}"
+    )
+
+    print(
+        f"PAD token ID: "
+        f"{tokenizer.pad_token_id}"
     )
 
     # ==================================================
     # Dataset
     # ==================================================
 
+    print()
+    print("Loading datasets...")
+
     train_dataset = InstructionDataset(
-        Path(config.train_file),
+        config.train_file,
         tokenizer,
-        config.max_length
+        config.max_length,
     )
 
     val_dataset = InstructionDataset(
-        Path(config.val_file),
+        config.val_file,
         tokenizer,
-        config.max_length
+        config.max_length,
+    )
+
+    print(
+        f"Train examples: "
+        f"{len(train_dataset):,}"
+    )
+
+    print(
+        f"Val examples  : "
+        f"{len(val_dataset):,}"
     )
 
     # ==================================================
@@ -48,51 +125,78 @@ def main():
     train_loader = DataLoader(
         train_dataset,
         batch_size=config.batch_size,
-        shuffle=True
+        shuffle=True,
+        num_workers=config.num_workers,
+        pin_memory=(
+            device.type == "cuda"
+        ),
     )
 
     val_loader = DataLoader(
         val_dataset,
         batch_size=config.batch_size,
-        shuffle=False
+        shuffle=False,
+        num_workers=config.num_workers,
+        pin_memory=(
+            device.type == "cuda"
+        ),
+    )
+
+    print()
+    print(
+        f"Train batches : "
+        f"{len(train_loader):,}"
+    )
+
+    print(
+        f"Val batches   : "
+        f"{len(val_loader):,}"
     )
 
     # ==================================================
     # Model
     # ==================================================
 
-    gpt_config = GPTConfig()
-
-    model = GPT(
-        gpt_config
-    ).to(device)
-
-    # ==================================================
-    # Load Base GPT
-    # ==================================================
-
-    base_checkpoint = torch.load(
-        config.base_checkpoint,
-        map_location=device,
-        weights_only=False
+    print()
+    print(
+        f"Loading Hugging Face model: "
+        f"{config.model_name}"
     )
 
-    # Your HF portable checkpoint contains the state
-    # dictionary directly.
-    if "model_state_dict" in base_checkpoint:
+    model = GPT2LMHeadModel.from_pretrained(
+        config.model_name
+    )
 
-        model.load_state_dict(
-            base_checkpoint["model_state_dict"]
-        )
+    # Match model padding configuration
+    model.config.pad_token_id = (
+        tokenizer.pad_token_id
+    )
 
-    else:
+    model.to(device)
 
-        model.load_state_dict(
-            base_checkpoint
-        )
+    # ==================================================
+    # Parameter Count
+    # ==================================================
+
+    total_params = sum(
+        parameter.numel()
+        for parameter in model.parameters()
+    )
+
+    trainable_params = sum(
+        parameter.numel()
+        for parameter in model.parameters()
+        if parameter.requires_grad
+    )
 
     print(
-        "Base GPT checkpoint loaded successfully."
+        f"Total parameters    : "
+        f"{total_params:,}"
+    )
+
+    print(
+        f"Trainable parameters: "
+        f"{trainable_params:,}"
     )
 
     # ==================================================
@@ -107,89 +211,18 @@ def main():
     )
 
     # ==================================================
-    # Resume SFT
+    # Fresh SFT Run
     # ==================================================
 
-    resume_path = (
-        Path(config.checkpoint_dir)
-        / "sft_best.pt"
+    print()
+    print("=" * 70)
+    print("STARTING FRESH SFT RUN")
+    print("=" * 70)
+
+    print(
+        "No previous SFT checkpoint "
+        "will be resumed."
     )
-
-    if resume_path.exists():
-
-        checkpoint = torch.load(
-            resume_path,
-            map_location=device,
-            weights_only=False
-        )
-
-        # ----------------------------------------------
-        # Restore model
-        # ----------------------------------------------
-
-        trainer.model.load_state_dict(
-            checkpoint["model_state_dict"]
-        )
-
-        # ----------------------------------------------
-        # Restore optimizer
-        # ----------------------------------------------
-
-        trainer.optimizer.load_state_dict(
-            checkpoint["optimizer_state_dict"]
-        )
-
-        # ----------------------------------------------
-        # Restore AMP scaler
-        # ----------------------------------------------
-
-        if (
-            trainer.use_amp
-            and "scaler_state_dict" in checkpoint
-        ):
-            trainer.scaler.load_state_dict(
-                checkpoint["scaler_state_dict"]
-            )
-
-        # ----------------------------------------------
-        # Restore training state
-        # ----------------------------------------------
-
-        trainer.global_step = (
-            checkpoint["global_step"]
-        )
-
-        trainer.best_val_loss = (
-            checkpoint.get(
-                "best_val_loss",
-                float("inf")
-            )
-        )
-
-        # ----------------------------------------------
-        # IMPORTANT:
-        # Do NOT restore old scheduler state.
-        #
-        # We created a fresh scheduler using:
-        # scheduler_max_steps = 6000
-        # ----------------------------------------------
-
-        print(
-            f"Resumed SFT from step "
-            f"{trainer.global_step:,}"
-        )
-
-        print(
-            f"Best validation loss: "
-            f"{trainer.best_val_loss:.4f}"
-        )
-
-    else:
-
-        print(
-            "No SFT checkpoint found. "
-            "Starting SFT from base GPT."
-        )
 
     # ==================================================
     # Train

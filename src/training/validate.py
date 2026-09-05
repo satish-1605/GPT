@@ -19,3 +19,23 @@ def validate(loader, model, device):
             num_batches += 1
     val_loss = total_loss/num_batches
     return val_loss 
+
+
+from src.models.gpt import GPT
+from src.utils.config import GPTConfig
+
+config = GPTConfig()
+from src.datasets.data_pipeline import get_train_val_test_loaders
+
+_, val_loader, _ = get_train_val_test_loaders(config)
+if __name__ == "__main__":
+
+    fresh_model = GPT(config).to("cpu")
+
+    fresh_val_loss = validate(
+        loader=val_loader,
+        model=fresh_model,
+        device="cpu"
+    )
+
+    print("Fresh model validation loss:", fresh_val_loss)

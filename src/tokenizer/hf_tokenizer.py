@@ -59,3 +59,15 @@ class HFTokenizer:
             self.decode(ids)
             for ids in batch_ids
         ]
+
+
+if __name__ == "__main__":
+    tokenizer = HFTokenizer("artifacts/tokenizer/tokenizer.json")
+    text = "The capital of France is Paris."
+
+    ids = tokenizer.encode(text)
+    decoded = tokenizer.decode(ids)
+
+    print("Original:", text)
+    print("Token IDs:", ids)
+    print("Decoded :", decoded)

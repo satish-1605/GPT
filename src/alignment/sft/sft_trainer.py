@@ -4,8 +4,8 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-
 class SFTTrainer:
+
 
     def __init__(
         self,
@@ -22,9 +22,9 @@ class SFTTrainer:
         self.device = torch.device(config.device)
         self.model.to(self.device)
 
-        # --------------------------------------------------
+        # ======================================================
         # Optimizer
-        # --------------------------------------------------
+        # ======================================================
 
         self.optimizer = torch.optim.AdamW(
             self.model.parameters(),
@@ -34,27 +34,31 @@ class SFTTrainer:
             eps=config.eps,
         )
 
-        # --------------------------------------------------
+        # ======================================================
         # Scheduler
-        # --------------------------------------------------
+        # Warmup -> Cosine Decay
+        # ======================================================
 
-        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-                    self.optimizer,
-                    T_max=config.scheduler_max_steps,
-                    eta_min=config.learning_rate * config.min_lr_ratio,
-                )
+        self.warmup_steps = int(
+            config.max_steps * config.warmup_ratio
+        )
 
-        # --------------------------------------------------
+        self.scheduler = torch.optim.lr_scheduler.LambdaLR(
+            self.optimizer,
+            lr_lambda=self._lr_lambda,
+        )
+
+        # ======================================================
         # Loss
-        # --------------------------------------------------
+        # ======================================================
 
         self.loss_fn = nn.CrossEntropyLoss(
             ignore_index=-100
         )
 
-        # --------------------------------------------------
+        # ======================================================
         # Mixed Precision
-        # --------------------------------------------------
+        # ======================================================
 
         self.use_amp = (
             config.use_amp
@@ -62,6 +66,7 @@ class SFTTrainer:
         )
 
         if self.use_amp:
+
             self.amp_dtype = getattr(
                 torch,
                 config.amp_dtype
@@ -69,18 +74,24 @@ class SFTTrainer:
 
             self.scaler = torch.amp.GradScaler(
                 "cuda",
-                enabled=True
+                enabled=True,
             )
+
         else:
+
             self.amp_dtype = torch.float32
             self.scaler = None
 
-        # --------------------------------------------------
-        # Training state
-        # --------------------------------------------------
+        # ======================================================
+        # Training State
+        # ======================================================
 
         self.global_step = 0
         self.best_val_loss = float("inf")
+
+        # ======================================================
+        # Checkpoint Directory
+        # ======================================================
 
         self.checkpoint_dir = Path(
             config.checkpoint_dir
@@ -88,23 +99,78 @@ class SFTTrainer:
 
         self.checkpoint_dir.mkdir(
             parents=True,
-            exist_ok=True
+            exist_ok=True,
         )
 
-    # ======================================================
+    # ==========================================================
+    # LEARNING RATE
+    # ==========================================================
+
+    def _lr_lambda(self, step):
+
+        # Warmup
+        if (
+            self.warmup_steps > 0
+            and step < self.warmup_steps
+        ):
+
+            return float(step + 1) / float(
+                self.warmup_steps
+            )
+
+        # Minimum LR after training
+        if step >= self.config.max_steps:
+
+            return self.config.min_lr_ratio
+
+        # Cosine Decay
+        progress = (
+            step - self.warmup_steps
+        ) / max(
+            1,
+            self.config.max_steps
+            - self.warmup_steps,
+        )
+
+        cosine_decay = 0.5 * (
+            1.0
+            + torch.cos(
+                torch.tensor(
+                    torch.pi * progress
+                )
+            ).item()
+        )
+
+        return (
+            self.config.min_lr_ratio
+            + (
+                1.0
+                - self.config.min_lr_ratio
+            )
+            * cosine_decay
+        )
+
+    # ==========================================================
     # LOSS
-    # ======================================================
+    # ==========================================================
 
     def _compute_loss(self, batch):
 
         input_ids = batch["input_ids"].to(
             self.device,
-            non_blocking=True
+            non_blocking=True,
+        )
+
+        attention_mask = batch[
+            "attention_mask"
+        ].to(
+            self.device,
+            non_blocking=True,
         )
 
         labels = batch["labels"].to(
             self.device,
-            non_blocking=True
+            non_blocking=True,
         )
 
         with torch.autocast(
@@ -112,24 +178,31 @@ class SFTTrainer:
             dtype=self.amp_dtype,
             enabled=self.use_amp,
         ):
-            logits = self.model(input_ids)
 
+            outputs = self.model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+            )
+
+            logits = outputs.logits
+
+            # Shift for next-token prediction
             shifted_logits = logits[:, :-1, :]
             shifted_labels = labels[:, 1:]
 
             loss = self.loss_fn(
                 shifted_logits.reshape(
                     -1,
-                    shifted_logits.size(-1)
+                    shifted_logits.size(-1),
                 ),
-                shifted_labels.reshape(-1)
+                shifted_labels.reshape(-1),
             )
 
         return loss
 
-    # ======================================================
+    # ==========================================================
     # VALIDATION
-    # ======================================================
+    # ==========================================================
 
     @torch.no_grad()
     def evaluate(self):
@@ -153,17 +226,18 @@ class SFTTrainer:
 
         return total_loss / batches
 
-    # ======================================================
-    # CHECKPOINT
-    # ======================================================
+    # ==========================================================
+    # SAVE CHECKPOINT
+    # ==========================================================
 
     def save_checkpoint(
         self,
         path,
-        val_loss=None
+        val_loss=None,
     ):
 
         checkpoint = {
+
             "model_state_dict":
                 self.model.state_dict(),
 
@@ -181,28 +255,30 @@ class SFTTrainer:
         }
 
         if self.use_amp:
-            checkpoint["scaler_state_dict"] = (
-                self.scaler.state_dict()
-            )
+
+            checkpoint[
+                "scaler_state_dict"
+            ] = self.scaler.state_dict()
 
         if val_loss is not None:
+
             checkpoint["val_loss"] = val_loss
 
         torch.save(
             checkpoint,
-            path
+            path,
         )
 
-    # ======================================================
+    # ==========================================================
     # LOAD CHECKPOINT
-    # ======================================================
+    # ==========================================================
 
     def load_checkpoint(self, path):
 
         checkpoint = torch.load(
             path,
             map_location=self.device,
-            weights_only=False
+            weights_only=False,
         )
 
         self.model.load_state_dict(
@@ -217,20 +293,20 @@ class SFTTrainer:
             checkpoint["scheduler_state_dict"]
         )
 
-        self.global_step = (
-            checkpoint["global_step"]
-        )
-        self.scheduler.last_epoch = self.global_step
+        self.global_step = checkpoint[
+            "global_step"
+        ]
 
         self.best_val_loss = checkpoint.get(
             "best_val_loss",
-            float("inf")
+            float("inf"),
         )
 
         if (
             self.use_amp
             and "scaler_state_dict" in checkpoint
         ):
+
             self.scaler.load_state_dict(
                 checkpoint["scaler_state_dict"]
             )
@@ -240,9 +316,9 @@ class SFTTrainer:
             f"{self.global_step:,}"
         )
 
-    # ======================================================
+    # ==========================================================
     # TRAIN
-    # ======================================================
+    # ==========================================================
 
     def train(self):
 
@@ -252,23 +328,35 @@ class SFTTrainer:
         print("SFT TRAINING")
         print("=" * 70)
 
-        print(f"Device        : {self.device}")
+        print(
+            f"Device        : {self.device}"
+        )
+
         print(
             f"Max Steps     : "
             f"{self.config.max_steps:,}"
         )
+
         print(
             f"Epochs        : "
             f"{self.config.epochs}"
         )
+
         print(
             f"Learning Rate : "
             f"{self.config.learning_rate}"
         )
+
         print(
             f"Batch Size    : "
             f"{self.config.batch_size}"
         )
+
+        print(
+            f"Warmup Steps  : "
+            f"{self.warmup_steps:,}"
+        )
+
         print(
             f"AMP           : "
             f"{self.use_amp}"
@@ -297,6 +385,10 @@ class SFTTrainer:
             // steps_per_epoch
         ) + 1
 
+        # ======================================================
+        # MAIN TRAINING LOOP
+        # ======================================================
+
         while (
             self.global_step
             < self.config.max_steps
@@ -305,6 +397,7 @@ class SFTTrainer:
         ):
 
             try:
+
                 batch = next(
                     train_iterator
                 )
@@ -313,7 +406,10 @@ class SFTTrainer:
 
                 current_epoch += 1
 
-                if current_epoch > self.config.epochs:
+                if (
+                    current_epoch
+                    > self.config.epochs
+                ):
                     break
 
                 train_iterator = iter(
@@ -324,9 +420,9 @@ class SFTTrainer:
                     train_iterator
                 )
 
-            # --------------------------------------------------
+            # ==================================================
             # Forward
-            # --------------------------------------------------
+            # ==================================================
 
             self.optimizer.zero_grad(
                 set_to_none=True
@@ -336,9 +432,9 @@ class SFTTrainer:
                 batch
             )
 
-            # --------------------------------------------------
+            # ==================================================
             # Backward + Optimizer
-            # --------------------------------------------------
+            # ==================================================
 
             if self.use_amp:
 
@@ -352,21 +448,14 @@ class SFTTrainer:
 
                 torch.nn.utils.clip_grad_norm_(
                     self.model.parameters(),
-                    self.config.max_grad_norm
+                    self.config.max_grad_norm,
                 )
 
-                # self.scaler.step(
-                #     self.optimizer
-                # )
+                self.scaler.step(
+                    self.optimizer
+                )
 
-                # self.scaler.update()
-
-                old_scale = self.scaler.get_scale()
-
-                self.scaler.step(self.optimizer)
                 self.scaler.update()
-
-                new_scale = self.scaler.get_scale()
 
             else:
 
@@ -374,30 +463,29 @@ class SFTTrainer:
 
                 torch.nn.utils.clip_grad_norm_(
                     self.model.parameters(),
-                    self.config.max_grad_norm
+                    self.config.max_grad_norm,
                 )
 
                 self.optimizer.step()
 
-            # --------------------------------------------------
-            # Scheduler
-            # --------------------------------------------------
-
-            if new_scale >= old_scale:
-                self.scheduler.step()
-
-            # --------------------------------------------------
-            # Step bookkeeping
-            # --------------------------------------------------
+            # ==================================================
+            # Global Step + Scheduler
+            # ==================================================
 
             self.global_step += 1
+
+            self.scheduler.step()
+
+            # ==================================================
+            # Bookkeeping
+            # ==================================================
 
             running_loss += loss.item()
             running_steps += 1
 
-            # --------------------------------------------------
-            # Logging + Validation
-            # --------------------------------------------------
+            # ==================================================
+            # LOGGING
+            # ==================================================
 
             if (
                 self.global_step
@@ -410,8 +498,6 @@ class SFTTrainer:
                     / running_steps
                 )
 
-                val_loss = self.evaluate()
-
                 lr = (
                     self.optimizer
                     .param_groups[0]["lr"]
@@ -422,18 +508,38 @@ class SFTTrainer:
                     f"{self.config.epochs}] | "
                     f"Step {self.global_step:,} | "
                     f"Train Loss: {train_loss:.4f} | "
-                    f"Val Loss: {val_loss:.4f} | "
                     f"LR: {lr:.2e}"
                 )
 
                 running_loss = 0.0
                 running_steps = 0
 
-                # --------------------------------------------------
-                # Best checkpoint
-                # --------------------------------------------------
+            # ==================================================
+            # EVALUATION
+            # ==================================================
 
-                if val_loss < self.best_val_loss:
+            if (
+                self.global_step
+                % self.config.eval_interval
+                == 0
+            ):
+
+                val_loss = self.evaluate()
+
+                print(
+                    f"Step {self.global_step:,} | "
+                    f"Val Loss: {val_loss:.4f}"
+                )
+
+                # ==============================================
+                # BEST CHECKPOINT
+                # ==============================================
+
+                if (
+                    self.config.save_best
+                    and val_loss
+                    < self.best_val_loss
+                ):
 
                     self.best_val_loss = val_loss
 
@@ -444,7 +550,7 @@ class SFTTrainer:
 
                     self.save_checkpoint(
                         best_path,
-                        val_loss
+                        val_loss,
                     )
 
                     print(
@@ -452,16 +558,16 @@ class SFTTrainer:
                         f"{best_path}"
                     )
 
-            # --------------------------------------------------
-            # Periodic checkpoint
-            # --------------------------------------------------
+            # ==================================================
+            # PERIODIC CHECKPOINT
+            # ==================================================
 
             if (
-                    self.config.save_interval > 0
-                    and self.global_step
-                    % self.config.save_interval
-                    == 0
-                ):
+                self.config.save_interval > 0
+                and self.global_step
+                % self.config.save_interval
+                == 0
+            ):
 
                 checkpoint_path = (
                     self.checkpoint_dir
@@ -478,9 +584,9 @@ class SFTTrainer:
                     f"{checkpoint_path}"
                 )
 
-        # ==================================================
+        # ======================================================
         # FINAL CHECKPOINT
-        # ==================================================
+        # ======================================================
 
         final_path = (
             self.checkpoint_dir
@@ -489,7 +595,7 @@ class SFTTrainer:
 
         self.save_checkpoint(
             final_path,
-            self.best_val_loss
+            self.best_val_loss,
         )
 
         print("=" * 70)

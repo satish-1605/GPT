@@ -5,58 +5,107 @@ import torch
 from torch.utils.data import Dataset
 
 class InstructionDataset(Dataset):
-    def __init__(self, file_path:str | Path, tokenizer, max_length:int):
+
+    def __init__(
+        self,
+        file_path,
+        tokenizer,
+        max_length,
+    ):
+
         self.file_path = Path(file_path)
         self.tokenizer = tokenizer
         self.max_length = max_length
 
+        # GPT-2 does not have a separate PAD token.
+        # Use EOS as PAD and rely on attention_mask
+        # to distinguish padding from real tokens.
+        self.tokenizer.pad_token = (
+            self.tokenizer.eos_token
+        )
+
         self.examples = self._load_dataset()
+
+    # ==========================================================
+    # LOAD DATASET
+    # ==========================================================
 
     def _load_dataset(self):
 
         if not self.file_path.exists():
+
             raise FileNotFoundError(
                 f"Dataset not found: {self.file_path}"
             )
-        
+
         examples = []
 
-        with self.file_path.open("r", encoding="utf-8") as f:
-            for line_number, line in enumerate(f, start=1):
+        with self.file_path.open(
+            "r",
+            encoding="utf-8",
+        ) as f:
+
+            for line_number, line in enumerate(
+                f,
+                start=1,
+            ):
+
                 line = line.strip()
 
                 if not line:
                     continue
 
                 try:
+
                     example = json.loads(line)
+
                 except json.JSONDecodeError as e:
+
                     raise ValueError(
-                        f"Invalid JSON at line {line_number}:{e}"
+                        f"Invalid JSON at line "
+                        f"{line_number}: {e}"
                     )
 
                 if "instruction" not in example:
+
                     raise ValueError(
                         f"Missing 'instruction' "
                         f"at line {line_number}"
                     )
 
                 if "response" not in example:
+
                     raise ValueError(
                         f"Missing 'response' "
                         f"at line {line_number}"
                     )
 
                 examples.append(example)
+
         return examples
 
+    # ==========================================================
+    # FORMAT INSTRUCTION
+    # ==========================================================
+
     def format_instruction(self, example):
-        instruction = example["instruction"].strip()
-        input_text = example.get("input", "").strip()
-        response = example["response"].strip()
+
+        instruction = example[
+            "instruction"
+        ].strip()
+
+        input_text = example.get(
+            "input",
+            "",
+        ).strip()
+
+        response = example[
+            "response"
+        ].strip()
 
         if input_text:
-            prompt =  (
+
+            prompt = (
                 "### Instruction:\n"
                 f"{instruction}\n\n"
                 "### Input:\n"
@@ -65,63 +114,151 @@ class InstructionDataset(Dataset):
             )
 
         else:
+
             prompt = (
-            "### Instruction:\n"
-            f"{instruction}\n\n"
-            "### Response:\n"
+                "### Instruction:\n"
+                f"{instruction}\n\n"
+                "### Response:\n"
+            )
+
+        return prompt, response
+
+    # ==========================================================
+    # ENCODE
+    # ==========================================================
+
+    def _encode(
+        self,
+        prompt,
+        response,
+    ):
+
+        prompt_ids = self.tokenizer.encode(
+            prompt,
+            add_special_tokens=False,
         )
 
-        response_text = (
-            f"{response}"
-        "<|endoftext|>")
+        response_ids = self.tokenizer.encode(
+            response,
+            add_special_tokens=False,
+        )
 
-        return prompt, response_text
+        # Explicit EOS after every response
+        response_ids.append(
+            self.tokenizer.eos_token_id
+        )
 
-    def _encode(self, prompt, response):
-        prompt_ids = self.tokenizer.encode(prompt)
-        response_ids = self.tokenizer.encode(response)
+        token_ids = (
+            prompt_ids
+            + response_ids
+        )
 
-        token_ids = prompt_ids + response_ids
-        token_ids = token_ids[:self.max_length]
+        # Truncate
+        token_ids = token_ids[
+            :self.max_length
+        ]
 
-        prompt_length = len(prompt_ids)
+        prompt_length = len(
+            prompt_ids
+        )
 
+        # Mask prompt tokens.
+        # Only response tokens contribute
+        # to the SFT loss.
         labels = (
-        [-100] * prompt_length
-        + response_ids
-    )
-        labels = labels[:self.max_length]
+            [-100] * prompt_length
+            + response_ids
+        )
 
-        padding_length = (self.max_length - len(token_ids))
+        labels = labels[
+            :self.max_length
+        ]
+
+        # Attention mask before padding
+        attention_mask = [
+            1
+        ] * len(token_ids)
+
+        # Padding
+        padding_length = (
+            self.max_length
+            - len(token_ids)
+        )
 
         if padding_length > 0:
-            pad_id = self.tokenizer.pad_token_id
 
-            token_ids = token_ids + (
-                [pad_id]
+            token_ids += (
+                [
+                    self.tokenizer.pad_token_id
+                ]
                 * padding_length
             )
 
-            labels = labels + (
-                [-100] * padding_length
+            labels += (
+                [-100]
+                * padding_length
             )
 
-        return token_ids, labels
+            attention_mask += (
+                [0]
+                * padding_length
+            )
+
+        return (
+            token_ids,
+            labels,
+            attention_mask,
+        )
+
+    # ==========================================================
+    # LENGTH
+    # ==========================================================
 
     def __len__(self):
 
-        return len(self.examples)
+        return len(
+            self.examples
+        )
+
+    # ==========================================================
+    # GET ITEM
+    # ==========================================================
 
     def __getitem__(self, index):
-        example = self.examples[index]
-        prompt, response  = self.format_instruction(example)
 
-        token_ids, labels = self._encode(prompt, response)
+        example = self.examples[
+            index
+        ]
 
-        input_ids = torch.tensor(token_ids, dtype=torch.long)
-        labels = torch.tensor(labels, dtype=torch.long)
+        prompt, response = (
+            self.format_instruction(
+                example
+            )
+        )
+
+        (
+            token_ids,
+            labels,
+            attention_mask,
+        ) = self._encode(
+            prompt,
+            response,
+        )
 
         return {
-            "input_ids": input_ids,
-            "labels": labels,
+
+            "input_ids": torch.tensor(
+                token_ids,
+                dtype=torch.long,
+            ),
+
+            "attention_mask": torch.tensor(
+                attention_mask,
+                dtype=torch.long,
+            ),
+
+            "labels": torch.tensor(
+                labels,
+                dtype=torch.long,
+            ),
         }

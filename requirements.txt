@@ -6,3 +6,4 @@ scikit-learn
 regex
 huggingface_hub
 tokenizers
+transformers
