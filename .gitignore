@@ -3,5 +3,4 @@ __pycache__/
 *.pyc
 venv
 artifacts
-data/processed
-data/raw
+data/gpt
